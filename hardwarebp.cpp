@@ -19,6 +19,7 @@ void HardwareBreakpoint::Set(void* address, int len, Condition when)
 	{
 	case 1: len = 0; break;
 	case 2: len = 1; break;
+	//case 3: len = 2; break;
 	case 4: len = 3; break;
 	default: assert(false); // invalid length
 	}

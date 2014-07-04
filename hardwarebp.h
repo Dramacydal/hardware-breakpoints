@@ -14,7 +14,12 @@ public:
 
 	// The enum values correspond to the values used by the Intel Pentium,
 	// so don't change them!
-	enum Condition { Write = 1, Read /* or write! */ = 3 };
+	enum Condition
+    {
+        Code = 0,
+        Write = 1,
+        Read = 3,   // or write
+    };
 
 	void Set(void* address, int len /* 1, 2, or 4 */, Condition when);
 	void Clear();
