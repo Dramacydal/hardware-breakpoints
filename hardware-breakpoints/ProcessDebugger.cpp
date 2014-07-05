@@ -27,7 +27,7 @@ bool ProcessDebugger::FindAndAttach()
     return true;
 }
 
-bool ProcessDebugger::AddBreakPoint(std::wstring moduleName, HardwareBreakpoint* bp)
+DWORD ProcessDebugger::GetModuleAddress(std::wstring moduleName) const
 {
     HMODULE hMod = 0;
     if (moduleName.find(L".exe") == std::wstring::npos)
@@ -38,11 +38,18 @@ bool ProcessDebugger::AddBreakPoint(std::wstring moduleName, HardwareBreakpoint*
             printf("Not found\n");
             hMod = LoadLibraryW(moduleName.c_str());
         }
-        if (!hMod)
-            return false;
     }
     else
         hMod = (HMODULE)baseAddress;
+
+    return (DWORD)hMod;
+}
+
+bool ProcessDebugger::AddBreakPoint(std::wstring moduleName, HardwareBreakpoint* bp)
+{
+    HMODULE hMod = (HMODULE)GetModuleAddress(moduleName);
+    if (!hMod)
+        return false;
 
     int offs = (int)bp->GetAddress();
     if (offs < 0)
@@ -54,7 +61,7 @@ bool ProcessDebugger::AddBreakPoint(std::wstring moduleName, HardwareBreakpoint*
     {
         bp->Set(threadId);
     }
-    catch (BreakPointException& e)
+    catch (BreakPointException&)
     {
         return false;
     }
@@ -69,7 +76,7 @@ bool ProcessDebugger::StopDebugging()
     for (auto bp : breakPoints)
         delete bp;
 
-    return DebugActiveProcessStop(processId);
+    return DebugActiveProcessStop(processId) ? true : false;
 }
 
 bool ProcessDebugger::RemoveBreakPoint(DWORD address)
@@ -86,7 +93,7 @@ bool ProcessDebugger::RemoveBreakPoint(DWORD address)
             }
         }
     }
-    catch (BreakPointException& e)
+    catch (BreakPointException&)
     {
         return false;
     }
@@ -103,30 +110,20 @@ bool ProcessDebugger::WaitForDebugEvents(DWORD time)
             return false;
 
         bool okEvent = false;
-        switch(DebugEvent.dwDebugEventCode)
+        switch (DebugEvent.dwDebugEventCode)
         {
             case EXCEPTION_DEBUG_EVENT:
                 // exception occured!
                 if(DebugEvent.u.Exception.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP)
                 {
-                    //std::cout << "Debug event occured! Process Id: " << DebugEvent.dwProcessId << " Thread Id: " << DebugEvent.dwThreadId << " Addr: " << std::hex << DebugEvent.u.Exception.ExceptionRecord.ExceptionAddress << std::dec << std::endl;
-                    HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, false, DebugEvent.dwThreadId);
-                    //assert(hThread);
-
-
-                    CONTEXT Context;
-                    Context.ContextFlags = CONTEXT_FULL;
-                    GetThreadContext(hThread, &Context);
-
                     for (auto bp : breakPoints)
-                        if (bp->GetAddress() == Context.Eip)
-                            bp->HandleException(Context);
-
-                    //std::cout << std::hex << Context.Eip << std::dec << std::endl;
-                    //Context.Eip += 6;
-                    SetThreadContext(hThread, &Context);
-
-                    okEvent = true;
+                    {
+                        if (bp->OnEvent(DebugEvent, this))
+                        {
+                            okEvent = true;
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -156,3 +153,69 @@ bool ProcessDebugger::WaitForDebugEvents(DWORD time)
         }
     }
 }
+
+template <class T>
+T ProcessDebugger::Read(std::wstring moduleName, DWORD addr)
+{
+    DWORD moduleAddress = GetModuleAddress(moduleName);
+    if (!moduleAddress)
+    {
+        printf("Failed to get module address\n");
+        return (T)0;
+    }
+
+    HANDLE phandle = OpenProcess(PROCESS_VM_READ, 0, processId);
+    if (!phandle)
+    {
+        printf("Failed to process handle\n");
+        return (T)0;
+    }
+
+    T value;
+    if (!ReadProcessMemory(phandle, (void*)(addr + moduleAddress), &value, sizeof(value), 0))
+    {
+        printf("Failed to read memory\n");
+        return (T)0;
+    }
+
+    if (!CloseHandle(phandle))
+    {
+        printf("Failed to close process handle\n");
+        return (T)0;
+    }
+
+    return value;
+}
+
+template <class T>
+void ProcessDebugger::Write(std::wstring moduleName, DWORD addr, T& value)
+{
+    DWORD moduleAddress = GetModuleAddress(moduleName);
+    if (!moduleAddress)
+    {
+        printf("Failed to get module address\n");
+        return;
+    }
+
+    HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, 0, processId);
+    if (!phandle)
+    {
+        printf("Failed to process handle\n");
+        return;
+    }
+
+    if (!WriteProcessMemory(phandle, (void*)(addr + moduleAddress), &value, sizeof(value), 0))
+    {
+        printf("Failed to write memory\n");
+        return;
+    }
+
+    if (!CloseHandle(phandle))
+    {
+        printf("Failed to close process handle\n");
+        return;
+    }
+}
+
+template int ProcessDebugger::Read(std::wstring moduleName, DWORD addr);
+template void ProcessDebugger::Write(std::wstring moduleName, DWORD addr, int& value);

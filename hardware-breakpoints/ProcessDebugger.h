@@ -18,6 +18,13 @@ class ProcessDebugger
 
         bool WaitForDebugEvents(DWORD time = INFINITE);
 
+        DWORD GetModuleAddress(std::wstring moduleName) const;
+
+        template <class T>
+        T Read(std::wstring moduleName, DWORD addr);
+        template <class T>
+        void Write(std::wstring moduleName, DWORD addr, T& value);
+
     protected:
         std::wstring processName;
         DWORD processId;

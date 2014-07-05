@@ -102,7 +102,7 @@ void HardwareBreakpoint::UnSet()
     m_index = -1;
 }
 
-bool HardwareBreakpoint::OnEvent(DEBUG_EVENT& DebugEvent)
+bool HardwareBreakpoint::OnEvent(DEBUG_EVENT& DebugEvent, ProcessDebugger* pd)
 {
     if (DebugEvent.dwThreadId != threadId)
         return false;
@@ -122,7 +122,7 @@ bool HardwareBreakpoint::OnEvent(DEBUG_EVENT& DebugEvent)
     if (Context.Eip != GetAddress())
         return false;
 
-    if (HandleException(Context))
+    if (HandleException(Context, pd))
         if (!SetThreadContext(hThread, &Context))
             throw BreakPointException("Failed to set thread context");
 

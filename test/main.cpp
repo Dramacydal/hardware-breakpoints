@@ -12,11 +12,17 @@ class IncBreakPoint : public HardwareBreakpoint
         IncBreakPoint(DWORD _address, int _len, Condition _condition) :
             HardwareBreakpoint(_address, _len, _condition) { }
 
-        virtual bool HandleException(CONTEXT& ctx) override
+        virtual bool HandleException(CONTEXT& ctx, ProcessDebugger* pd) override
         {
             // skip 'inc a'
             ctx.Eip += 6;
-            std::cout << "Triggered" << std::endl;
+
+            // inc 'a' artificially
+            DWORD addr = 0x404430 - 0x400000;
+            int a = pd->Read<int>(L"process.exe", addr) + 3;
+            pd->Write<int>(L"process.exe", addr, a);
+
+            std::cout << "Triggered " << std::endl;
             return true;
         }
 };

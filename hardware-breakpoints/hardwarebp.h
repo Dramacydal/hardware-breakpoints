@@ -11,6 +11,8 @@
 #include <exception>
 #include <string>
 
+class ProcessDebugger;
+
 class BreakPointException : public std::exception
 {
     public:
@@ -35,13 +37,12 @@ public:
 
     int GetIndex() const { return m_index; }
     DWORD GetAddress() const { return address; }
-    virtual bool HandleException(CONTEXT& ctx) { return false; }
+    virtual bool HandleException(CONTEXT& ctx, ProcessDebugger* pd) { return false; }
 
     void Set(DWORD threadId);
     void UnSet();
-    bool OnEvent(DEBUG_EVENT& DebugEvent);
+    bool OnEvent(DEBUG_EVENT& DebugEvent, ProcessDebugger* pd);
     inline void Shift(DWORD offset, bool set = false) { if (set) address = offset; else address += offset; }
-    //virtual void HandleException() = 0;
 
 protected:
 
