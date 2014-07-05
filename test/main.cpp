@@ -37,7 +37,7 @@ void main()
     }
 
     IncBreakPoint* bp = new IncBreakPoint(0x4012B0 - 0x400000, 1, HardwareBreakpoint::Condition::Code);
-    if (!pd.AddBreakPoint(bp))
+    if (!pd.AddBreakPoint(L"program.exe", bp))
     {
         std::cout << "Failed to add breakpoint" << std::endl;
         return;

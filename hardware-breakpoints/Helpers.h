@@ -4,8 +4,8 @@
 #include <Windows.h>
 
 bool SetDebugPrivilege(bool on);
-DWORD GetProcessID(wchar_t* szExeName);
+DWORD GetProcessID(wchar_t const* szExeName);
 DWORD GetProcessThreadID(DWORD dwProcessID);
-DWORD GetModuleBaseAddress(DWORD processId, wchar_t* moduleName);
+DWORD GetModuleBaseAddress(DWORD processId, wchar_t const* moduleName);
 
 #endif

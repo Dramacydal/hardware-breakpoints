@@ -28,8 +28,8 @@ public:
         Write = 1,
         Read = 3,   // or write
     };
-
-    HardwareBreakpoint(DWORD _address, int _len, Condition _condition)
+    
+    HardwareBreakpoint(int _address, int _len, Condition _condition)
         : threadId(0), address(_address), len(_len), condition(_condition) { m_index = -1; }
     ~HardwareBreakpoint() { UnSet(); }
 
@@ -40,7 +40,7 @@ public:
     void Set(DWORD threadId);
     void UnSet();
     bool OnEvent(DEBUG_EVENT& DebugEvent);
-    void Shift(DWORD offset) { address += offset; }
+    inline void Shift(DWORD offset, bool set = false) { if (set) address = offset; else address += offset; }
     //virtual void HandleException() = 0;
 
 protected:

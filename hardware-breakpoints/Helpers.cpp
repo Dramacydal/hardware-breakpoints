@@ -35,7 +35,7 @@ bool SetDebugPrivilege(bool on)
 }
 
 // gets process id of given image name
-DWORD GetProcessID(wchar_t* szExeName)
+DWORD GetProcessID(wchar_t const* szExeName)
 {
     PROCESSENTRY32 pe = { sizeof(PROCESSENTRY32) };
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -61,7 +61,7 @@ DWORD GetProcessThreadID(DWORD dwProcessID)
     return 0;
 }
 
-DWORD GetModuleBaseAddress(DWORD processId, wchar_t* moduleName)
+DWORD GetModuleBaseAddress(DWORD processId, wchar_t const* moduleName)
 {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processId);
     MODULEENTRY32 module;

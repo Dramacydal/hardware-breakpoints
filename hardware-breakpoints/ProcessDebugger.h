@@ -10,16 +10,16 @@ class ProcessDebugger
 {
     public:
         typedef std::set<HardwareBreakpoint*> BreakPointContainer;
-        ProcessDebugger(wchar_t* _processName);
+        ProcessDebugger(std::wstring _processName);
         bool FindAndAttach();
-        bool AddBreakPoint(HardwareBreakpoint* bp);
+        bool AddBreakPoint(std::wstring moduleName, HardwareBreakpoint* bp);
         bool StopDebugging();
         bool RemoveBreakPoint(DWORD address);
 
         bool WaitForDebugEvents(DWORD time = INFINITE);
 
     protected:
-        wchar_t* processName;
+        std::wstring processName;
         DWORD processId;
         DWORD baseAddress;
         DWORD threadId;

@@ -2,15 +2,17 @@
 #include "Helpers.h"
 #include "hardwarebp.h"
 
-ProcessDebugger::ProcessDebugger(wchar_t* _processName) : processName(_processName) { }
+ProcessDebugger::ProcessDebugger(std::wstring _processName) : processName(_processName)
+{
+}
 
 bool ProcessDebugger::FindAndAttach()
 {
-    processId = GetProcessID(processName);
+    processId = GetProcessID(processName.c_str());
     if (!processId)
         return false;
 
-    baseAddress = GetModuleBaseAddress(processId, processName);
+    baseAddress = GetModuleBaseAddress(processId, processName.c_str());
     if (!baseAddress)
         return false;
 
@@ -25,20 +27,39 @@ bool ProcessDebugger::FindAndAttach()
     return true;
 }
 
-bool ProcessDebugger::AddBreakPoint(HardwareBreakpoint* bp)
+bool ProcessDebugger::AddBreakPoint(std::wstring moduleName, HardwareBreakpoint* bp)
 {
-    //HardwareBreakpoint* bp = new HardwareBreakpoint(threadId, baseAddress + offset, len, HardwareBreakpoint::Condition(condition));
+    HMODULE hMod = 0;
+    if (moduleName.find(L".exe") == std::wstring::npos)
+    {
+        hMod = GetModuleHandleW(moduleName.c_str());
+        if (!hMod)
+        {
+            printf("Not found\n");
+            hMod = LoadLibraryW(moduleName.c_str());
+        }
+        if (!hMod)
+            return false;
+    }
+    else
+        hMod = (HMODULE)baseAddress;
+
+    int offs = (int)bp->GetAddress();
+    if (offs < 0)
+        bp->Shift((DWORD)GetProcAddress(hMod, (LPCSTR)(-offs)), true);
+    else
+        bp->Shift((DWORD)hMod);
+
     try
     {
-        bp->Shift(baseAddress);
         bp->Set(threadId);
-        breakPoints.insert(bp);
     }
     catch (BreakPointException& e)
     {
-        delete bp;
         return false;
     }
+
+    breakPoints.insert(bp);
 
     return true;
 }
