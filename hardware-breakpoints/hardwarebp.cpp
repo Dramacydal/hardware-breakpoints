@@ -30,8 +30,7 @@ void HardwareBreakpoint::Set(DWORD _threadId)
 
     HANDLE handle = OpenThread(THREAD_ALL_ACCESS, FALSE, threadId);
 
-    if (!SuspendThread(handle))
-        throw BreakPointException("Failed to suspend thread");
+    DWORD suspended = SuspendThread(handle);
 
     // Read the register values
     if (!GetThreadContext(handle, &cxt))
@@ -64,7 +63,7 @@ void HardwareBreakpoint::Set(DWORD _threadId)
     if (!SetThreadContext(handle, &cxt))
         throw BreakPointException("Failed to set thread context");
 
-    if (!ResumeThread(handle))
+    if (suspended != -1 && ResumeThread(handle) == -1)
         throw BreakPointException("Failed to resume thread");
 }
 
@@ -79,8 +78,8 @@ void HardwareBreakpoint::UnSet()
     cxt.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 
     HANDLE handle = OpenThread(THREAD_ALL_ACCESS, FALSE, threadId);
-    if (!SuspendThread(handle))
-        throw BreakPointException("Failed to suspend thread");
+    DWORD suspended = SuspendThread(handle);
+    //printf("Deleting breakpoint. Suspended: %d\n", suspended);
 
     // Read the register values
     if (!GetThreadContext(handle, &cxt))
@@ -88,7 +87,7 @@ void HardwareBreakpoint::UnSet()
 
     // Zero out the debug register settings for this breakpoint
     if (m_index < 0 || m_index >= MAX_BREAKPOINTS)
-        throw BreakPointException("Failed to set suspend thread");
+        throw BreakPointException("Bogus breakpoints index");
 
     SetBits(cxt.Dr7, m_index*2, 1, 0);
 
@@ -96,7 +95,7 @@ void HardwareBreakpoint::UnSet()
     if (!SetThreadContext(handle, &cxt))
         throw BreakPointException("Failed to set thread context");
 
-    if (!ResumeThread(handle))
+    if (suspended != -1 && ResumeThread(handle) == -1)
         throw BreakPointException("Failed to resume thread");
 
     m_index = -1;
@@ -107,12 +106,9 @@ bool HardwareBreakpoint::OnEvent(DEBUG_EVENT& DebugEvent, ProcessDebugger* pd)
     if (DebugEvent.dwThreadId != threadId)
         return false;
 
-    //std::cout << "Debug event occured! Process Id: " << DebugEvent.dwProcessId << " Thread Id: " << DebugEvent.dwThreadId << " Addr: " << std::hex << DebugEvent.u.Exception.ExceptionRecord.ExceptionAddress << std::dec << std::endl;
     HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, false, DebugEvent.dwThreadId);
     if (!hThread)
         throw BreakPointException("Failed to open thread");
-
-    //assert(hThread);
 
     CONTEXT Context;
     Context.ContextFlags = CONTEXT_FULL;
@@ -125,9 +121,6 @@ bool HardwareBreakpoint::OnEvent(DEBUG_EVENT& DebugEvent, ProcessDebugger* pd)
     if (HandleException(Context, pd))
         if (!SetThreadContext(hThread, &Context))
             throw BreakPointException("Failed to set thread context");
-
-    //std::cout << std::hex << Context.Eip << std::dec << std::endl;
-    //Context.Eip += 6;
 
     return true;
 }

@@ -3,6 +3,7 @@
 #include <TlHelp32.h>
 #include <hardwarebp.h>
 #include <assert.h>
+#include <signal.h>
 #include "Helpers.h"
 #include "ProcessDebugger.h"
 
@@ -19,7 +20,7 @@ class IncBreakPoint : public HardwareBreakpoint
 
             // inc 'a' artificially
             DWORD addr = 0x404430 - 0x400000;
-            int a = pd->Read<int>(L"process.exe", addr) + 3;
+            int a = pd->Read<int>(L"process.exe", addr) + 10;
             pd->Write<int>(L"process.exe", addr, a);
 
             std::cout << "Triggered " << std::endl;
@@ -27,33 +28,66 @@ class IncBreakPoint : public HardwareBreakpoint
         }
 };
 
+ProcessDebugger* pd;
+
+void SignalHandler(int s)
+{
+    switch (s)
+    {
+        case SIGINT:
+            printf("Caught SIGINT\n");
+            if (pd && pd->IsDebugging())
+                pd->StopDebugging();
+            break;
+        default:
+            break;
+    }
+}
+
 void main()
 {
+    signal(SIGINT, SignalHandler);
     if (!SetDebugPrivilege(true))
     {
         std::cout << "Failed to set debug privileges" << std::endl;
         return;
     }
 
-    ProcessDebugger pd(L"program.exe");
-    if (!pd.FindAndAttach())
+    pd = new ProcessDebugger(L"program.exe");
+    if (!pd->FindAndAttach())
     {
         std::cout << "Can't find process" << std::endl;
         return;
     }
 
     IncBreakPoint* bp = new IncBreakPoint(0x4012B0 - 0x400000, 1, HardwareBreakpoint::Condition::Code);
-    if (!pd.AddBreakPoint(L"program.exe", bp))
+    if (!pd->AddBreakPoint(L"program.exe", bp))
     {
         std::cout << "Failed to add breakpoint" << std::endl;
         return;
     }
 
-    if (!pd.WaitForDebugEvents())
+    try
     {
-        std::cout << "Fail while waiting for debug events" << std::endl;
-        return;
+        if (!pd->StartListener())
+        {
+            std::cout << "Fail while waiting for debug events" << std::endl;
+            return;
+        }
+    }
+    catch (MemoryException& e)
+    {
+        std::cout << "Memory Exception: " << e.what() << std::endl;
     }
 
-    pd.StopDebugging();
+    //std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    try
+    {
+        //pd->StopDebugging();
+    }
+    catch (std::exception& e)
+    {
+        std::cout << e.what() << std::endl;
+    }
 }
