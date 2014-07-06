@@ -1,6 +1,7 @@
 #ifndef _PROCESSDEBUGGER_H
 #define _PROCESSDEBUGGER_H
 
+#include <atomic>
 #include <exception>
 #include <set>
 #include <Windows.h>
@@ -23,7 +24,9 @@ class ProcessDebugger
         bool FindAndAttach();
         bool AddBreakPoint(std::wstring moduleName, HardwareBreakpoint* bp);
         bool StopDebugging();
+        bool Detach();
         bool RemoveBreakPoint(DWORD address);
+        bool RemoveBreakPoints();
 
         bool StartListener(DWORD time = INFINITE);
 
@@ -37,9 +40,13 @@ class ProcessDebugger
         BreakPointContainer const& GetBreakPoints() const { return breakPoints; }
         bool IsDebugging() const { return isDebugging; }
 
+        static std::thread* Run(ProcessDebugger* pd);
+
     protected:
 
-        bool isDebugging;
+        static void RunnerThread(ProcessDebugger* pd);
+        std::atomic_bool isDebugging;
+        std::atomic_bool detached;
 
         std::wstring processName;
         DWORD processId;

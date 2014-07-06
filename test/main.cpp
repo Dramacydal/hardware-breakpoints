@@ -10,7 +10,7 @@
 class IncBreakPoint : public HardwareBreakpoint
 {
     public:
-        IncBreakPoint(DWORD _address, int _len, Condition _condition) :
+        IncBreakPoint(int _address, int _len, Condition _condition) :
             HardwareBreakpoint(_address, _len, _condition) { }
 
         virtual bool HandleException(CONTEXT& ctx, ProcessDebugger* pd) override
@@ -36,7 +36,7 @@ void SignalHandler(int s)
     {
         case SIGINT:
             printf("Caught SIGINT\n");
-            if (pd && pd->IsDebugging())
+            if (pd)
                 pd->StopDebugging();
             break;
         default:
@@ -54,12 +54,10 @@ void main()
     }
 
     pd = new ProcessDebugger(L"program.exe");
-    if (!pd->FindAndAttach())
-    {
-        std::cout << "Can't find process" << std::endl;
-        return;
-    }
+    std::thread* th = ProcessDebugger::Run(pd);
 
+
+    Sleep(500);
     IncBreakPoint* bp = new IncBreakPoint(0x4012B0 - 0x400000, 1, HardwareBreakpoint::Condition::Code);
     if (!pd->AddBreakPoint(L"program.exe", bp))
     {
@@ -67,27 +65,5 @@ void main()
         return;
     }
 
-    try
-    {
-        if (!pd->StartListener())
-        {
-            std::cout << "Fail while waiting for debug events" << std::endl;
-            return;
-        }
-    }
-    catch (MemoryException& e)
-    {
-        std::cout << "Memory Exception: " << e.what() << std::endl;
-    }
-
-    //std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    try
-    {
-        //pd->StopDebugging();
-    }
-    catch (std::exception& e)
-    {
-        std::cout << e.what() << std::endl;
-    }
+    th->join();
 }

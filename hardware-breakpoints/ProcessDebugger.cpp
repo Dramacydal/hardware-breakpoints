@@ -1,9 +1,12 @@
 #include "ProcessDebugger.h"
 #include "Helpers.h"
 #include "hardwarebp.h"
+#include<iostream>
 
-ProcessDebugger::ProcessDebugger(std::wstring _processName) : processName(_processName), isDebugging(false)
+ProcessDebugger::ProcessDebugger(std::wstring _processName) : processName(_processName)
 {
+    isDebugging = false;
+    detached = false;
 }
 
 bool ProcessDebugger::FindAndAttach()
@@ -72,18 +75,25 @@ bool ProcessDebugger::AddBreakPoint(std::wstring moduleName, HardwareBreakpoint*
     return true;
 }
 
+bool ProcessDebugger::Detach()
+{
+    if (detached)
+        return true;
+    detached = true;
+
+    if (!RemoveBreakPoints())
+        return false;
+
+    return DebugActiveProcessStop(processId) ? true : false;
+}
+
 bool ProcessDebugger::StopDebugging()
 {
     if (!isDebugging)
         return true;
     isDebugging = false;
 
-    for (auto bp : breakPoints)
-        delete bp;
-
-    ContinueDebugEvent(processId, threadId, DBG_CONTINUE);
-
-    return DebugActiveProcessStop(processId) ? true : false;
+    return true;
 }
 
 bool ProcessDebugger::RemoveBreakPoint(DWORD address)
@@ -108,12 +118,28 @@ bool ProcessDebugger::RemoveBreakPoint(DWORD address)
     return true;
 }
 
+bool ProcessDebugger::RemoveBreakPoints()
+{
+    try
+    {
+        for (auto bp : breakPoints)
+            delete bp;
+        breakPoints.clear();
+    }
+    catch (BreakPointException&)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 bool ProcessDebugger::StartListener(DWORD time)
 {
     DEBUG_EVENT DebugEvent;
-    for (int i = 0; ; ++i)
+    for (int i = 0; isDebugging; ++i)
     {
-        if (!WaitForDebugEvent(&DebugEvent, 200))
+        if (!WaitForDebugEvent(&DebugEvent, INFINITE))
         {
             if (!isDebugging)
                 break;
@@ -145,13 +171,58 @@ bool ProcessDebugger::StartListener(DWORD time)
                 break;
         }
 
-        if (i > 15)
-            break;
+        //if (i > 15)
+        //    StopDebugging();
+
+        if (!isDebugging)
+        {
+            detached = true;
+            RemoveBreakPoints();
+            ContinueDebugEvent(DebugEvent.dwProcessId, DebugEvent.dwThreadId, okEvent ? DBG_CONTINUE : DBG_EXCEPTION_NOT_HANDLED);
+            DebugActiveProcessStop(processId);
+            return true;
+        }
 
         ContinueDebugEvent(DebugEvent.dwProcessId, DebugEvent.dwThreadId, okEvent ? DBG_CONTINUE : DBG_EXCEPTION_NOT_HANDLED);
     }
 
-    return true;
+    return Detach();
+}
+
+void ProcessDebugger::RunnerThread(ProcessDebugger* pd)
+{
+    if (!pd->FindAndAttach())
+    {
+        //std::cout << "Can't find process" << std::endl;
+        return;
+    }
+
+    try
+    {
+        if (!pd->StartListener())
+        {
+            //std::cout << "Fail while waiting for debug events" << std::endl;
+            return;
+        }
+    }
+    catch (MemoryException& e)
+    {
+        //printf("Memory Exception: %s\n", e.what());
+    }
+
+    try
+    {
+        pd->Detach();
+    }
+    catch (std::exception& e)
+    {
+        //printf("1: %s\n", e.what());
+    }
+}
+
+std::thread* ProcessDebugger::Run(ProcessDebugger* pd)
+{
+    return new std::thread(RunnerThread, pd);
 }
 
 template <class T>
