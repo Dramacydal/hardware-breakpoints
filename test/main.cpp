@@ -57,7 +57,12 @@ void main()
     std::thread* th = ProcessDebugger::Run(pd);
 
 
-    Sleep(500);
+    if (!pd->WaitForComeUp(500))
+    {
+        std::cout << "Failed to start thread" << std::endl;
+        return;
+    }
+
     IncBreakPoint* bp = new IncBreakPoint(0x4012B0 - 0x400000, 1, HardwareBreakpoint::Condition::Code);
     if (!pd->AddBreakPoint(L"program.exe", bp))
     {

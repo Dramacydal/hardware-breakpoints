@@ -9,6 +9,16 @@
 
 class HardwareBreakpoint;
 
+enum RunnerError
+{
+    ERR_OK                  = 0,
+    ERR_PROCESS_NOT_FOUND   = 1,
+    ERR_LISTENER_FAIL       = 2,
+    ERR_MEMORY_ACCESS       = 3,
+    ERR_BREAKPOINT_FAIL     = 4,
+    ERR_DETACH_FAIL         = 5,
+};
+
 class MemoryException : public std::exception
 {
     public:
@@ -28,7 +38,7 @@ class ProcessDebugger
         bool RemoveBreakPoint(DWORD address);
         bool RemoveBreakPoints();
 
-        bool StartListener(DWORD time = INFINITE);
+        RunnerError StartListener(DWORD time = INFINITE);
 
         DWORD GetModuleAddress(std::wstring moduleName) const;
 
@@ -39,6 +49,8 @@ class ProcessDebugger
 
         BreakPointContainer const& GetBreakPoints() const { return breakPoints; }
         bool IsDebugging() const { return isDebugging; }
+
+        bool WaitForComeUp(DWORD msec = 500);
 
         static std::thread* Run(ProcessDebugger* pd);
 
